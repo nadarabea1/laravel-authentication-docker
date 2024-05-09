@@ -1,22 +1,29 @@
-FROM php:7.4-apache
+# Use the official PHP 8.0 image
+FROM php:8.0-apache
 
-RUN apt-get update && apt-get install -y \
-    libpng-dev \
-    libonig-dev \
-    libxml2-dev \
-    zip \
-    unzip \
-    curl
-
-RUN apt-get clean && rm -rf /var/lib/apt/lists/*
-
-RUN docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd
-
+# Set the working directory
 WORKDIR /var/www/html
 
-COPY . /var/www/html
+# Copy existing application directory permissions
+COPY --chown=www-data:www-data . /var/www/html
 
-COPY docker/apache/site.conf /etc/apache2/sites-available/000-default.conf
+# Install PHP extensions and dependencies
+RUN apt-get update && apt-get install -y \
+    libzip-dev \
+    zip \
+    && docker-php-ext-install zip pdo_mysql
+
+# Enable Apache modules
 RUN a2enmod rewrite
+
+# Copy Apache vhost file
+COPY docker/apache/site.conf /etc/apache2/sites-available/000-default.conf
+
+# Change document root to /var/www/html/public
+ENV APACHE_DOCUMENT_ROOT /var/www/html/public
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
+RUN sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
+
+# Expose port 80 and start Apache server
 EXPOSE 80
 CMD ["apache2-foreground"]
